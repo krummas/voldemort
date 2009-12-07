@@ -24,6 +24,7 @@ import java.util.Properties;
 
 import voldemort.client.protocol.RequestFormatType;
 import voldemort.store.bdb.BdbStorageConfiguration;
+import voldemort.store.drizzle.DrizzleStorageConfiguration;
 import voldemort.store.memory.CacheStorageConfiguration;
 import voldemort.store.memory.InMemoryStorageConfiguration;
 import voldemort.store.mysql.MysqlStorageConfiguration;
@@ -77,6 +78,12 @@ public class VoldemortConfig implements Serializable {
     private String mysqlDatabaseName;
     private String mysqlHost;
     private int mysqlPort;
+
+    private String drizzleUsername;
+    private String drizzlePassword;
+    private String drizzleDatabaseName;
+    private String drizzleHost;
+    private int drizzlePort;
 
     private int readOnlyBackups;
     private String readOnlyStorageDir;
@@ -203,6 +210,13 @@ public class VoldemortConfig implements Serializable {
         this.mysqlPort = props.getInt("mysql.port", 3306);
         this.mysqlDatabaseName = props.getString("mysql.database", "voldemort");
 
+        this.drizzleUsername = props.getString("drizzle.user", "");
+        this.drizzlePassword = props.getString("drizzle.password", "");
+        this.drizzleHost = props.getString("drizzle.host", "localhost");
+        this.drizzlePort = props.getInt("drizzle.port", 4427);
+        this.drizzleDatabaseName = props.getString("drizzle.database", "voldemort");
+
+
         this.maxThreads = props.getInt("max.threads", 100);
         this.coreThreads = props.getInt("core.threads", Math.max(1, maxThreads / 2));
 
@@ -252,6 +266,7 @@ public class VoldemortConfig implements Serializable {
         this.storageConfigurations = props.getList("storage.configs",
                                                    ImmutableList.of(BdbStorageConfiguration.class.getName(),
                                                                     MysqlStorageConfiguration.class.getName(),
+                                                                    DrizzleStorageConfiguration.class.getName(),
                                                                     InMemoryStorageConfiguration.class.getName(),
                                                                     CacheStorageConfiguration.class.getName(),
                                                                     ReadOnlyStorageConfiguration.class.getName()));
@@ -643,6 +658,47 @@ public class VoldemortConfig implements Serializable {
     public void setMysqlPort(int mysqlPort) {
         this.mysqlPort = mysqlPort;
     }
+
+    public String getDrizzleUsername() {
+        return drizzleUsername;
+    }
+
+    public void setDrizzleUsername(String drizzleUsername) {
+        this.drizzleUsername = drizzleUsername;
+    }
+
+    public String getDrizzlePassword() {
+        return drizzlePassword;
+    }
+
+    public void setDrizzlePassword(String drizzlePassword) {
+        this.drizzlePassword = drizzlePassword;
+    }
+
+    public String getDrizzleDatabaseName() {
+        return drizzleDatabaseName;
+    }
+
+    public void setdrizzleDatabaseName(String drizzleDatabaseName) {
+        this.drizzleDatabaseName = drizzleDatabaseName;
+    }
+
+    public String getDrizzleHost() {
+        return drizzleHost;
+    }
+
+    public void setDrizzleHost(String drizzleHost) {
+        this.drizzleHost = drizzleHost;
+    }
+
+    public int getDrizzlePort() {
+        return drizzlePort;
+    }
+
+    public void setDrizzlePort(int drizzlePort) {
+        this.drizzlePort = drizzlePort;
+    }
+
 
     public String getSlopStoreType() {
         return slopStoreType;
