@@ -16,14 +16,8 @@
 
 package voldemort.server;
 
-import static voldemort.utils.Utils.croak;
-
-import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-
+import com.google.common.collect.ImmutableList;
 import org.apache.log4j.Logger;
-
 import voldemort.VoldemortException;
 import voldemort.annotations.jmx.JmxOperation;
 import voldemort.client.protocol.RequestFormatType;
@@ -39,6 +33,7 @@ import voldemort.server.protocol.SocketRequestHandlerFactory;
 import voldemort.server.protocol.admin.AsyncOperationRunner;
 import voldemort.server.rebalance.Rebalancer;
 import voldemort.server.rebalance.RebalancerService;
+import voldemort.server.rest.RestService;
 import voldemort.server.scheduler.SchedulerService;
 import voldemort.server.socket.AdminService;
 import voldemort.server.socket.SocketService;
@@ -51,7 +46,11 @@ import voldemort.utils.Utils;
 import voldemort.versioning.Versioned;
 import voldemort.xml.ClusterMapper;
 
-import com.google.common.collect.ImmutableList;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+
+import static voldemort.utils.Utils.croak;
 
 /**
  * This is the main server, it bootstraps all the services.
@@ -189,6 +188,11 @@ public class VoldemortServer extends AbstractService {
         if(voldemortConfig.isJmxEnabled())
             services.add(new JmxService(this, this.metadata.getCluster(), storeRepository, services));
 
+        // todo: add to config
+        services.add(new RestService(this,
+                                     storageService,
+                                     storeRepository));
+        
         return ImmutableList.copyOf(services);
     }
 
