@@ -62,7 +62,7 @@ public class ConsistentRoutingStrategy implements RoutingStrategy {
             for(Integer partition: n.getPartitionIds()) {
                 if(m.containsKey(partition))
                     throw new IllegalArgumentException("Duplicate partition id " + partition
-                                                       + " in cluster configuration.");
+                                                       + " in cluster configuration " + nodes);
                 m.put(partition, n);
             }
         }
@@ -89,22 +89,43 @@ public class ConsistentRoutingStrategy implements RoutingStrategy {
     }
 
     public List<Node> routeRequest(byte[] key) {
+        List<Integer> partitionList = getPartitionList(key);
+
+        if(partitionList.size() == 0)
+            return new ArrayList<Node>(0);
+
+        List<Node> preferenceList = new ArrayList<Node>(partitionList.size());
+        for(int partition: partitionList) {
+            preferenceList.add(partitionToNode[partition]);
+        }
+
+        return preferenceList;
+    }
+
+    public List<Integer> getReplicatingPartitionList(int index) {
         List<Node> preferenceList = new ArrayList<Node>(numReplicas);
-        int index = abs(hash.hash(key)) % this.partitionToNode.length;
+        List<Integer> replicationPartitionsList = new ArrayList<Integer>(numReplicas);
+
+        if(partitionToNode.length == 0) {
+            return new ArrayList<Integer>(0);
+        }
+
         for(int i = 0; i < partitionToNode.length; i++) {
             // add this one if we haven't already
-            if(!preferenceList.contains(partitionToNode[index]))
+            if(!preferenceList.contains(partitionToNode[index])) {
                 preferenceList.add(partitionToNode[index]);
+                replicationPartitionsList.add(index);
+            }
 
             // if we have enough, go home
             if(preferenceList.size() >= numReplicas)
-                return preferenceList;
+                return replicationPartitionsList;
             // move to next clockwise slot on the ring
             index = (index + 1) % partitionToNode.length;
         }
 
         // we don't have enough, but that may be okay
-        return preferenceList;
+        return replicationPartitionsList;
     }
 
     public Set<Node> getNodes() {
@@ -127,21 +148,7 @@ public class ConsistentRoutingStrategy implements RoutingStrategy {
     }
 
     public List<Integer> getPartitionList(byte[] key) {
-        List<Integer> preferenceList = new ArrayList<Integer>(numReplicas);
-        int index = Math.abs(hash.hash(key)) % this.partitionToNode.length;
-        for(int i = 0; i < partitionToNode.length; i++) {
-            // add this one if we haven't already
-            if(!preferenceList.contains(index))
-                preferenceList.add(index);
-
-            // if we have enough, go home
-            if(preferenceList.size() >= numReplicas)
-                return preferenceList;
-
-            // move to next clockwise slot on the ring
-            index = (index + 1) % partitionToNode.length;
-        }
-        return preferenceList;
+        int index = abs(hash.hash(key)) % (Math.max(1, this.partitionToNode.length));
+        return getReplicatingPartitionList(index);
     }
-
 }

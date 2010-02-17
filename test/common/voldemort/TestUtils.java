@@ -117,7 +117,6 @@ public class TestUtils {
     /**
      * Create a string with some random letters
      * 
-     * @param SEEDED_RANDOM The Random number generator to use
      * @param length The length of the string to create
      * @return The string
      */
@@ -274,7 +273,6 @@ public class TestUtils {
      * @param cluster
      * @param data
      * @param baseDir
-     * @param TEST_SIZE
      * @return the directory where the index is created
      * @throws Exception
      */
@@ -309,7 +307,7 @@ public class TestUtils {
 
         // make a temp dir
         File dataDir = new File(baseDir + File.separatorChar + "read-only-temp-index-"
-                                + new Integer((int) (Math.random() * 1000)));
+                                + ((int) (Math.random() * 1000)));
         // build and open store
         JsonStoreBuilder storeBuilder = new JsonStoreBuilder(jsonReader,
                                                              cluster,
@@ -335,7 +333,7 @@ public class TestUtils {
             for(int p = 0; p < partitionMap[i].length; p++) {
                 partitionList.add(partitionMap[i][p]);
             }
-            nodes.add(new Node(i, "localhost", 8880 + i, 6666 + i, partitionList));
+            nodes.add(new Node(i, "localhost", 8880 + i, 6666 + i, 7000 + i, partitionList));
         }
 
         return nodes;
@@ -358,7 +356,7 @@ public class TestUtils {
 
             SortedSet<Integer> bPartitonSet = new TreeSet<Integer>(nodeB.getPartitionIds());
             for(int p: nodeA.getPartitionIds()) {
-                if(!bPartitonSet.contains(new Integer(p))) {
+                if(!bPartitonSet.contains(p)) {
                     diffPartition++;
                 }
             }
@@ -378,4 +376,32 @@ public class TestUtils {
         }
     }
 
+    public static void assertWithBackoff(long timeout, Attempt attempt) throws Exception {
+        assertWithBackoff(30, timeout, attempt);
+    }
+
+    public static void assertWithBackoff(long initialDelay, long timeout, Attempt attempt) throws Exception {
+        long delay = initialDelay;
+        long finishBy = System.currentTimeMillis() + timeout;
+
+        while (true) {
+            try {
+                attempt.checkCondition();
+                return;
+            } catch (AssertionError e) {
+                if (System.currentTimeMillis() < finishBy) {
+                    try {
+                        Thread.sleep(delay);
+                        delay <<= 1;
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw ie;
+                    }
+                }
+                else {
+                    throw e;
+                }
+            }
+        }
+    }
 }

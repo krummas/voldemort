@@ -18,11 +18,19 @@ package voldemort.client;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
+import java.util.Properties;
 import java.util.Set;
 import java.util.Map.Entry;
 
 import org.apache.commons.io.FileUtils;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
 import voldemort.ServerTestUtils;
 import voldemort.TestUtils;
@@ -42,6 +50,7 @@ import voldemort.versioning.Versioned;
  * @author bbansal
  * 
  */
+@RunWith(Parameterized.class)
 public class AdminServiceFilterTest extends AbstractAdminServiceFilterTest {
 
     private static int TEST_KEYS = 10000;
@@ -50,15 +59,31 @@ public class AdminServiceFilterTest extends AbstractAdminServiceFilterTest {
     private AdminClient adminClient;
     private VoldemortServer server;
     private Cluster cluster;
+    private final boolean useNio;
+
+    public AdminServiceFilterTest(boolean useNio) {
+        this.useNio = useNio;
+    }
+
+    @Parameters
+    public static Collection<Object[]> configs() {
+        return Arrays.asList(new Object[][] { { true }, { false } });
+    }
 
     @Override
+    @Before
     public void setUp() throws IOException {
         cluster = ServerTestUtils.getLocalCluster(2);
-        VoldemortConfig config = ServerTestUtils.createServerConfig(0,
+        VoldemortConfig config = ServerTestUtils.createServerConfig(useNio,
+                                                                    0,
                                                                     TestUtils.createTempDir()
                                                                              .getAbsolutePath(),
                                                                     null,
-                                                                    storesXmlfile);
+                                                                    storesXmlfile,
+                                                                    new Properties());
+
+        config.setEnableNetworkClassLoader(true);
+
         server = new VoldemortServer(config, cluster);
         server.start();
 
@@ -66,6 +91,7 @@ public class AdminServiceFilterTest extends AbstractAdminServiceFilterTest {
     }
 
     @Override
+    @After
     public void tearDown() throws IOException, InterruptedException {
         adminClient.stop();
         server.stop();

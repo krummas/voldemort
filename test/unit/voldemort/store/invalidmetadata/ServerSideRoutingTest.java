@@ -18,9 +18,13 @@ package voldemort.store.invalidmetadata;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Properties;
 import java.util.Map.Entry;
 
 import junit.framework.TestCase;
+
+import org.junit.Test;
+
 import voldemort.ServerTestUtils;
 import voldemort.TestUtils;
 import voldemort.cluster.Cluster;
@@ -43,13 +47,13 @@ public class ServerSideRoutingTest extends TestCase {
 
     private static int TEST_VALUES_SIZE = 1000;
     private static String testStoreName = "test-replication-memory";
-    private static String storesXmlfile = "test/common/voldemort/config/stores.xml";
 
     /**
      * TODO : enable this test after serversideRouting is fixed.
      * 
      * @throws IOException
      */
+    @Test
     public void testServerSideRouting() throws IOException {
     // Cluster cluster = ServerTestUtils.getLocalCluster(2, new int[][] { { 0, 1
     // }, { 2, 3 } });
@@ -65,6 +69,7 @@ public class ServerSideRoutingTest extends TestCase {
     // checkServerSideRouting(server0, server1);
     }
 
+    @SuppressWarnings("unused")
     private void checkServerSideRouting(VoldemortServer server0, VoldemortServer server1) {
         // create bunch of key-value pairs
         HashMap<ByteArray, byte[]> entryMap = ServerTestUtils.createRandomKeyValuePairs(TEST_VALUES_SIZE);
@@ -91,15 +96,19 @@ public class ServerSideRoutingTest extends TestCase {
         }
     }
 
-    private VoldemortServer startServer(int node,
+    @SuppressWarnings("unused")
+    private VoldemortServer startServer(boolean useNio,
+                                        int node,
                                         String storesXmlfile,
                                         Cluster cluster,
                                         boolean metadataChecking) throws IOException {
-        VoldemortConfig config = ServerTestUtils.createServerConfig(node,
+        VoldemortConfig config = ServerTestUtils.createServerConfig(useNio,
+                                                                    node,
                                                                     TestUtils.createTempDir()
                                                                              .getAbsolutePath(),
                                                                     null,
-                                                                    storesXmlfile);
+                                                                    storesXmlfile,
+                                                                    new Properties());
 
         if(metadataChecking)
             config.setEnableMetadataChecking(true);

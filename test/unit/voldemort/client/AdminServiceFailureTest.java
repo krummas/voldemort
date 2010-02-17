@@ -2,21 +2,31 @@ package voldemort.client;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Map.Entry;
 
 import junit.framework.TestCase;
+
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
+
 import voldemort.ServerTestUtils;
 import voldemort.TestUtils;
 import voldemort.VoldemortException;
 import voldemort.client.protocol.admin.AdminClient;
 import voldemort.cluster.Cluster;
 import voldemort.cluster.Node;
+import voldemort.server.AbstractSocketService;
 import voldemort.server.StoreRepository;
 import voldemort.server.protocol.SocketRequestHandlerFactory;
-import voldemort.server.socket.SocketService;
 import voldemort.store.RandomlyFailingDelegatingStore;
 import voldemort.store.StorageEngine;
 import voldemort.store.StoreDefinition;
@@ -34,6 +44,7 @@ import com.google.common.collect.AbstractIterator;
  * @author bbansal
  * 
  */
+@RunWith(Parameterized.class)
 public class AdminServiceFailureTest extends TestCase {
 
     private static int TEST_KEYS = 10000;
@@ -41,18 +52,30 @@ public class AdminServiceFailureTest extends TestCase {
 
     private AdminClient adminClient;
     private Cluster cluster;
-    private SocketService adminServer;
+    private AbstractSocketService adminServer;
     StorageEngine<ByteArray, byte[]> failingStorageEngine;
-    private Thread thread;
 
     private enum StreamOperations {
         FETCH_ENTRIES,
         FETCH_KEYS,
         DELETE_PARTITIONS,
-        UPDATE_ENTRIES
+        UPDATE_ENTRIES,
+        TRUNCATE_ENTRIES
+    }
+
+    private final boolean useNio;
+
+    public AdminServiceFailureTest(boolean useNio) {
+        this.useNio = useNio;
+    }
+
+    @Parameters
+    public static Collection<Object[]> configs() {
+        return Arrays.asList(new Object[][] { { true }, { false } });
     }
 
     @Override
+    @Before
     public void setUp() throws IOException {
         cluster = ServerTestUtils.getLocalCluster(2, new int[][] { { 0, 1, 2, 3 }, { 4, 5, 6, 7 } });
         List<StoreDefinition> storeDefs = ServerTestUtils.getStoreDefs(1);
@@ -67,33 +90,38 @@ public class AdminServiceFailureTest extends TestCase {
         adminServer.start();
     }
 
-    private SocketService getAdminServer(Node node,
-                                         Cluster cluster,
-                                         List<StoreDefinition> storeDefs,
-                                         StorageEngine<ByteArray, byte[]> storageEngine)
+    private AbstractSocketService getAdminServer(Node node,
+                                                 Cluster cluster,
+                                                 List<StoreDefinition> storeDefs,
+                                                 StorageEngine<ByteArray, byte[]> storageEngine)
             throws IOException {
         StoreRepository storeRepository = new StoreRepository();
         storeRepository.addStorageEngine(storageEngine);
         storeRepository.addLocalStore(storageEngine);
 
-        return new SocketService(new SocketRequestHandlerFactory(storeRepository,
-                                                                 ServerTestUtils.createMetadataStore(cluster,
-                                                                                                     storeDefs),
-                                                                 ServerTestUtils.createServerConfig(0,
-                                                                                                    TestUtils.createTempDir()
-                                                                                                             .getAbsolutePath(),
-                                                                                                    null,
-                                                                                                    null),
-                                                                 null),
-                                 node.getAdminPort(),
-                                 2,
-                                 2,
-                                 10000,
-                                 "test-admin-service",
-                                 false);
+        SocketRequestHandlerFactory requestHandlerFactory = new SocketRequestHandlerFactory(null,
+                                                                                            storeRepository,
+                                                                                            ServerTestUtils.createMetadataStore(cluster,
+                                                                                                                                storeDefs),
+                                                                                            ServerTestUtils.createServerConfig(useNio,
+                                                                                                                               0,
+                                                                                                                               TestUtils.createTempDir()
+                                                                                                                                        .getAbsolutePath(),
+                                                                                                                               null,
+                                                                                                                               null,
+                                                                                                                               new Properties()),
+                                                                                            null,
+                                                                                            null);
+        return ServerTestUtils.getSocketService(useNio,
+                                                requestHandlerFactory,
+                                                node.getAdminPort(),
+                                                2,
+                                                2,
+                                                10000);
     }
 
     @Override
+    @After
     public void tearDown() throws IOException {
         try {
             adminServer.stop();
@@ -107,6 +135,7 @@ public class AdminServiceFailureTest extends TestCase {
         return adminClient;
     }
 
+    @Test
     public void testWithStartFailure() {
         // put some entries in store
         for(StreamOperations operation: StreamOperations.values()) {
@@ -121,12 +150,13 @@ public class AdminServiceFailureTest extends TestCase {
     }
 
     // client side should get exceptions from servers
+    @Test
     public void testFailures() {
 
         for(StreamOperations operation: StreamOperations.values()) {
             try {
                 doOperation(operation, 0, failingStorageEngine.getName(), Arrays.asList(0, 1));
-                fail("Unit test should fail here !!");
+                fail("Unit test should fail for " + operation);
             } catch(Exception e) {
                 // ignore
             }
@@ -144,17 +174,14 @@ public class AdminServiceFailureTest extends TestCase {
                 return;
             case FETCH_ENTRIES:
                 putAlltoStore();
-                consumeIterator(getAdminClient().fetchPartitionEntries(nodeId,
-                                                                       storeName,
-                                                                       partitionList,
-                                                                       null));
+                consumeIterator(getAdminClient().fetchEntries(nodeId,
+                                                              storeName,
+                                                              partitionList,
+                                                              null));
                 return;
             case FETCH_KEYS:
                 putAlltoStore();
-                consumeIterator(getAdminClient().fetchPartitionKeys(nodeId,
-                                                                    storeName,
-                                                                    partitionList,
-                                                                    null));
+                consumeIterator(getAdminClient().fetchKeys(nodeId, storeName, partitionList, null));
                 return;
             case UPDATE_ENTRIES:
                 getAdminClient().updateEntries(nodeId,
@@ -162,6 +189,11 @@ public class AdminServiceFailureTest extends TestCase {
                                                getRandomlyFailingIterator(ServerTestUtils.createRandomKeyValuePairs(TEST_KEYS)),
                                                null);
                 return;
+            case TRUNCATE_ENTRIES:
+                putAlltoStore();
+                getAdminClient().truncate(nodeId, storeName);
+                return;
+
             default:
                 throw new RuntimeException("Unknown operation");
         }
@@ -195,7 +227,7 @@ public class AdminServiceFailureTest extends TestCase {
                     throw new VoldemortException("Failing Iterator.");
                 }
 
-                if(innerIterator.hasNext())
+                if(!innerIterator.hasNext())
                     return endOfData();
 
                 Entry<ByteArray, byte[]> entry = innerIterator.next();
