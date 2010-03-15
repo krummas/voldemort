@@ -38,7 +38,7 @@ public class DrizzleStorageConfiguration implements StorageConfiguration {
                   + config.getDrizzleDatabaseName());
         ds.setUsername(config.getDrizzleUsername());
         ds.setPassword(config.getDrizzlePassword());
-        ds.setDriverClassName("org.drizzle.jdbc.Driver");
+        ds.setDriverClassName("org.drizzle.jdbc.DrizzleDriver");
         this.dataSource = ds;
     }
 

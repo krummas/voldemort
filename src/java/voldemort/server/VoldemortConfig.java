@@ -220,7 +220,7 @@ public class VoldemortConfig implements Serializable {
         this.drizzleUsername = props.getString("drizzle.user", "");
         this.drizzlePassword = props.getString("drizzle.password", "");
         this.drizzleHost = props.getString("drizzle.host", "localhost");
-        this.drizzlePort = props.getInt("drizzle.port", 4427);
+        this.drizzlePort = props.getInt("drizzle.port", 3306);
         this.drizzleDatabaseName = props.getString("drizzle.database", "voldemort");
 
         this.maxThreads = props.getInt("max.threads", 100);
